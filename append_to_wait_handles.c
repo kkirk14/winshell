@@ -6,13 +6,22 @@
 
 
 #include <windows.h>
+#include <inttypes.h>
+#include "_winshell_private.h"
 
 
 
 /**
  * append_to_wait_handles
  * 
+ * Appends an array of HANDLEs to the end of the job_mgt_data wait_handles
+ * array.
  * 
+ * handles: Array of handles to append
+ * len_handles: Number of HANDLEs in the handles array
+ * 
+ * Return Value: Returns TRUE on success. 
+ *               Returns FALSE on failure (realloc failed).
  */
 BOOL append_to_wait_handles(HANDLE *handles, int32_t len_handles) {
     
@@ -33,7 +42,7 @@ BOOL append_to_wait_handles(HANDLE *handles, int32_t len_handles) {
     }
 
     memmove(
-        &handles[n_wait_handles], 
+        &wait_handles[n_wait_handles], 
         handles, 
         len_handles * sizeof(HANDLE)
     );

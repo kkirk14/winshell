@@ -38,7 +38,7 @@ BOOL reap_proc(HANDLE proc_h) {
             continue;
 
         if (handle_arr_remove(curr_job->proc_hs, 
-                              &job->n_procs_alive, 
+                              &curr_job->n_procs_alive, 
                               proc_h)) {
             job = curr_job;
             break;
@@ -53,5 +53,6 @@ BOOL reap_proc(HANDLE proc_h) {
         free(job->cmdline);
         job->status = TERMINATED;
     }
+
     return TRUE;
 }

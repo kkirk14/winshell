@@ -28,9 +28,14 @@ int WINAPI wWinMain(HINSTANCE hInstance,
                     PWSTR cmdLine,
                     int nCmdShow) {
 
+    int rc; 
+
     WCHAR buf[1];
 
-    init_winshell();
+    rc = init_winshell();
+    if (rc < 0) {
+        ExitProcess(1);
+    }
 
     shell_loop();
     
@@ -39,13 +44,13 @@ int WINAPI wWinMain(HINSTANCE hInstance,
                           L"C:\\Users\\vek26\\AppData\\Local\\Programs\\Python\\Python39\\python.exe ..\\replace_space.py | "
                           L"C:\\Users\\vek26\\AppData\\Local\\Programs\\Python\\Python39\\python.exe ..\\replace_dash.py";
     */
-    WCHAR job_cmdline[] = L"C:\\Users\\vek26\\programming\\c\\my_cat.exe < C:\\Users\\vek26\\programming\\c\\lorem.txt | "
-                          L"C:\\Python313\\python.exe C:\\Users\\vek26\\programming\\c\\replace_space.py | "
-                          L"C:\\Python313\\python.exe C:\\Users\\vek26\\programming\\c\\replace_dash.py > .\\_lorem_.txt";
-    int32_t rc = spawn_job(job_cmdline);
-    wprintf(L"spawn_job rc: %d\n", rc);
-    
-    fgetc(stdin);
-    
+    //WCHAR job_cmdline[] = L"C:\\Users\\vek26\\programming\\c\\my_cat.exe < C:\\Users\\vek26\\programming\\c\\lorem.txt | "
+    //                      L"C:\\Python313\\python.exe C:\\Users\\vek26\\programming\\c\\replace_space.py | "
+    //                      L"C:\\Python313\\python.exe C:\\Users\\vek26\\programming\\c\\replace_dash.py > .\\_lorem_.txt";
+    //int32_t rc = spawn_job(job_cmdline);
+    //wprintf(L"spawn_job rc: %d\n", rc);
+    //
+    //fgetc(stdin);
+    //
     return 0;
 }

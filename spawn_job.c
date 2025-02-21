@@ -217,14 +217,42 @@ static BOOL spawn_job_failure_recover(job_t *job) {
 
 
 
+static void hexdump(const void *addr, DWORD n_bytes) {
+
+    const unsigned char *addr_c = (const unsigned char *)addr;
+    int i;
+
+    for (i = 0; i < n_bytes; i++) {
+        DWORD mod = i % 16;
+        switch (mod) {
+        case 15:
+            wprintf(L"%02x\n", addr_c[i]);
+            break;
+        case 7:
+            wprintf(L"%02x   ", addr_c[i]);
+            break;
+        case 0:
+            wprintf(L"%04d    %02x ", i, addr_c[i]);
+            break;
+        default:
+            wprintf(L"%02x ", addr_c[i]);
+            break;
+        }
+    }
+    if (i % 16 != 0) {
+        wprintf(L"\n");
+    }
+    fflush(stdout);
+}   
+
+
+
 /**
  * spawn_job
  *
  * Does all the work for spawning the job from the given job_cmdline. 
  * Cleans/parses the cmdline, sets up the pipes and I/O redirection, 
  * spawns the processes, and adds the job struct to the jobs array.
- * 
- * Note: This function will alter the buffer at job_cmdline.
  *
  * Return Value: Returns the jid of the new job on success. 
  *               Returns a negative number on failure:
@@ -232,7 +260,7 @@ static BOOL spawn_job_failure_recover(job_t *job) {
  *                - SPAWNJOB_EMPTY_CMDLINE
  *                - SPAWNJOB_SYSCALL_FAILURE
  */
-int32_t spawn_job(WCHAR *job_cmdline) {
+int32_t spawn_job(const WCHAR *job_cmdline) {
     
     BOOL bool_rc;
 
@@ -348,10 +376,7 @@ int32_t spawn_job(WCHAR *job_cmdline) {
         // Setup CreateProcessW creation flags
         DWORD dwCreationFlags = CREATE_UNICODE_ENVIRONMENT;
         if (job->n_procs_alive == 0) {
-            dwCreationFlags = CREATE_NEW_PROCESS_GROUP;
-        }
-        else {
-            dwCreationFlags = 0;
+            dwCreationFlags |= CREATE_NEW_PROCESS_GROUP;
         }
 
         // TODO: resolve application_name to absolute path
@@ -364,22 +389,17 @@ int32_t spawn_job(WCHAR *job_cmdline) {
             NULL,
             TRUE,
             dwCreationFlags,
-            NULL,//envp,
-            NULL,//curr_dir,
+            NULL, // envp,
+            NULL, // curr_dir,
             &startup_info,
-            &proc_info);
+            &proc_info
+        );
         if (!bool_rc) { // CreateProcessW failed
-            print_err(L"CreateProcessW");
+            print_err(L"spawn_job -> CreateProcessW");
             spawn_job_failure_recover(job);
             return SPAWNJOB_SYSCALL_FAILURE;
         }
         else { // CreateProcessW successful
-            wprintf(
-                L"successfully spawned %s with pid %d\n", 
-                curr_parsed_proc->cmd_line,
-                GetProcessId(proc_info.hProcess)
-            );
-            fflush(stdout);
             job->proc_hs[job->n_procs_alive++] = proc_info.hProcess;
             job->status = RUNNING;
             CloseHandle(proc_info.hThread);

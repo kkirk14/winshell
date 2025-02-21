@@ -77,6 +77,40 @@ extern job_t jobs[];
 
 
 
+/* cmdline: Contains a line read from stdin waiting to be read by the job 
+            spawner thread. */
+extern WCHAR cmdline[];
+
+/* cmdline_consumed_e: After reading and setting cmdline, the reader thread
+                       will wait on this condition before reading another line.
+                       The job spawner thread will signal this once it's done 
+                       with cmdline. This prevents a (probably very unlikely)
+                       race where commands are skipped. */
+extern HANDLE cmdline_consumed_e;
+                        
+/* cmdline_lock: HANDLE to a kernel mutex that protects the data in this file.
+                 Lock this whenever reading and writing cmdline. */
+extern HANDLE cmdline_lock;
+                        
+/* cmdline_available_e: HANDLE to a kernel event. It is in the signaled state  */
+extern HANDLE cmdline_available_e;
+
+
+
+/* exited: FALSE while shell is running, TRUE when the shell is exiting (and
+           cmdline reader thread needs to terminated). */
+extern BOOL exited;
+
+/* exited_lock: HANDLE to kernel mutex that protects the exited variable. */
+extern HANDLE exited_lock;
+
+/* exited_e: HANDLE to a kernel event that will be signaled when the shell is 
+              about to exit. This is how the main (job-spawning) thread will 
+              notify the cmdline reader thread that it should terminate. */
+extern HANDLE exited_e;
+
+
+
 /**
  * find_open_jid
  *
@@ -96,6 +130,22 @@ int32_t find_open_jid();
  *  - initializes the jobs array
  */
 int init_winshell();
+
+
+
+/**
+ * append_to_wait_handles
+ * 
+ * Appends an array of HANDLEs to the end of the job_mgt_data wait_handles
+ * array.
+ * 
+ * handles: Array of handles to append
+ * len_handles: Number of HANDLEs in the handles array
+ * 
+ * Return Value: Returns TRUE on success. 
+ *               Returns FALSE on failure (realloc failed).
+ */
+BOOL append_to_wait_handles(HANDLE *handles, int32_t len_handles);
 
 
 
@@ -177,7 +227,28 @@ parsed_process_t *parse_job_cmdline(const WCHAR *job_cmdline,
  * Return Value: Returns the jid of the new job on success. 
  *               Returns -1 on failure.
  */
-int32_t spawn_job(wchar_t *job_cmdline);
+int32_t spawn_job(const WCHAR *job_cmdline);
+
+
+
+/**
+ * shell_loop
+ * 
+ * Called by main to run the shell loop.
+ * Repeatedly reads commands from the console and spawns and manages jobs
+ * accordingly.
+ */
+void shell_loop();
+
+
+
+/**
+ * cmdline_reader_tproc
+ * 
+ * This is the thread procedure of the thread that reads commands from stdin
+ * and places them in the cmdline buffer.
+ */
+DWORD WINAPI cmdline_reader_tproc(void *arg);
 
 
 
