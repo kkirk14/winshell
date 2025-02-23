@@ -120,6 +120,83 @@ extern HANDLE exited_e;
 
 
 /**
+ * first_nonescaped_dquote
+ * 
+ * Searches a string for a non-escaped (\") double quote L'"'.
+ * 
+ * str: NULL-terminated string to be searched
+ * 
+ * Return Value: Returns a pointer to the next real L'"' character.
+ *               Returns NULL if there are no L'"' characters.
+ */
+WCHAR *first_nonescaped_dquote(const WCHAR *str);
+
+
+
+/**
+ * nonquoted_wcschr
+ * 
+ * Finds the first non-quoted instance of a given character in a string.
+ * All instances of c within "double quotes" will be ignored.
+ * 
+ * str: NULL-terminated to be searched.
+ * c: Character to search for.
+ * 
+ * Return Value: Returns a pointer to the first non-quoted instance of c in 
+ *               str. Returns NULL if non-quoted c isn't present in str.
+ */
+WCHAR *nonquoted_wcschr(const WCHAR *str, WCHAR c);
+
+
+
+/**
+ * skip_whitespace
+ * 
+ * Searches a string for the first non-whitespace character.
+ * 
+ * str: NULL-terminated string to be searched.
+ * 
+ * Return Value: Returns a pointer to the first non-whitespace character
+ *               in str. If str is all whitespace, returns a pointer to the
+ *               terminating L'\0'.
+ */
+WCHAR *skip_whitespace(const WCHAR *str);
+
+
+
+/**
+ * arg_end
+ * 
+ * Finds the end of the given argument by searching for the first non-quoted
+ * whitespace.
+ * 
+ * cmdline: NULL-string that contains a series of whitespace separated 
+ *          arguments.
+ * 
+ * Return Value: Returns a pointer to the end of the first argument
+ */
+WCHAR *arg_end(const WCHAR *cmdline);
+
+
+
+/**
+ * readjust_quotes
+ * 
+ * Scans str for double quotes.
+ * If double quotes are present, they are removed and the whole string is 
+ * enclosed in double quotes.
+ * If not, the string is left as is.
+ * 
+ * str: NULL-terminated string to be scanned and adjusted.
+ * 
+ * Return Value: Returns TRUE on success, FALSE on failure.
+ *               Will only fail if string ends with unclosed quotes.
+ */
+BOOL readjust_quotes(WCHAR *str);
+
+
+
+/**
  * find_open_jid
  *
  * Finds the first jid that's open to be used for a new job.
@@ -296,6 +373,38 @@ BOOL jobs_builtin(parsed_process_t *parsed_proc,
  */
 void exit_builtin(parsed_process_t *parsed_proc, 
                   STARTUPINFO *startup_info);
+
+
+
+/**
+ * pwd_builtin
+ * 
+ * Prints the current working directory.
+ * 
+ * parsed_proc: Contains information parsed from the command that called this
+ *              builtin. Not used.
+ * startup_info: Contains redirection info. Output is written to hStdOutput.
+ *
+ * Return Value: Returns TRUE on success. Returns FALSE on failure.
+ */
+BOOL pwd_builtin(parsed_process_t *parsed_proc, 
+                 STARTUPINFO *startup_info);
+
+
+
+/**
+ * cd_builtin
+ * 
+ * Changes the current working directory.
+ * 
+ * parsed_proc: Contains information about command line that called this 
+ *              builtin. The directory to move to will be extracted from this.
+ * startup_info: Contains I/O redirection information. Not used.
+ * 
+ * Return Value: Returns TRUE on success. Returns FALSE on failure.
+ */
+BOOL cd_builtin(parsed_process_t *parsed_proc, 
+                STARTUPINFO *startup_info);
 
 
 

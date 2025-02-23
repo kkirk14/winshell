@@ -71,6 +71,7 @@ void exit_builtin(parsed_process_t *parsed_proc,
         NULL,
         NULL
     );
-    Sleep(4000);
+
+    // Terminate process
     ExitProcess(0);
 }

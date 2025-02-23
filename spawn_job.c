@@ -339,7 +339,15 @@ int32_t spawn_job(const WCHAR *job_cmdline) {
             kill_builtin(curr_parsed_proc, &startup_info);
         }
 
-        // TODO: cd and pwd
+        // cd
+        else if (wcscmp(curr_parsed_proc->application_name, L"cd") == 0) {
+            cd_builtin(curr_parsed_proc, &startup_info);
+        }
+
+        // pwd
+        else if (wcscmp(curr_parsed_proc->application_name, L"pwd") == 0) {
+            pwd_builtin(curr_parsed_proc, &startup_info);
+        }
 
         // ---------- Process spawning ----------
         else {
