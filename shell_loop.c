@@ -150,6 +150,10 @@ void shell_loop() {
                 // Do nothing...
             }
 
+            else if (job_i == SPAWNJOB_EMPTY_JOB) {
+                // Do nothing...
+            }
+
             // Job was successfully spawned
             else {
                 job_t *job = &jobs[job_i];

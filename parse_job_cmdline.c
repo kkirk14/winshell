@@ -18,12 +18,13 @@
 #include <string.h>
 #include <inttypes.h>
 #include <wchar.h>
+#include <iso646.h>
 #include "_winshell_private.h"
 
 
 
 /**
- * find_real_dquote
+ * first_nonescaped_dquote
  * 
  * Searches a string for a non-escaped (\") double quote L'"'.
  * 
@@ -32,7 +33,7 @@
  * Return Value: Returns a pointer to the next real L'"' character.
  *               Returns NULL if there are no L'"' characters.
  */
-static WCHAR *find_real_dquote(const WCHAR *str) {
+static WCHAR *first_nonescaped_dquote(const WCHAR *str) {
 
     // edge case: first character is dquote
     // If we don't treat this as edge case, potential invalid mem access
@@ -45,6 +46,7 @@ static WCHAR *find_real_dquote(const WCHAR *str) {
 
     do {
         quote_p = wcschr(str_p, L'"');
+        str_p = quote_p + 1;
     } while (quote_p && *(quote_p - 1) == L'\\');
     
     return (WCHAR *)quote_p;
@@ -67,19 +69,31 @@ static WCHAR *find_real_dquote(const WCHAR *str) {
 static WCHAR *nonquoted_wcschr(const WCHAR *str, WCHAR c) {
     
     const WCHAR *str_p = str, 
-          *quote_p, 
+          *quote_block_start_p,
+          *quote_block_end_p, 
           *c_p;
-    BOOL is_quoted = FALSE;
+    BOOL valid;
     
     do {
+        valid = TRUE;
         c_p = wcschr(str_p, c);
-        quote_p = find_real_dquote(str_p);
-        while (c_p && quote_p && quote_p < c_p) {
-            is_quoted = !is_quoted;
-            quote_p = find_real_dquote(quote_p + 1);
+        quote_block_start_p = wcschr(str_p, L'"');
+        while (c_p && quote_block_start_p 
+                && quote_block_start_p < c_p) {
+            quote_block_end_p = 
+                first_nonescaped_dquote(quote_block_start_p + 1);
+            if (quote_block_end_p > c_p) {
+                valid = FALSE;
+                break;
+            }
+            else {
+                quote_block_start_p = wcschr(quote_block_end_p + 1, L'"');
+            }
         }
-        str_p = quote_p + 1;
-    } while(c_p && is_quoted);
+        if (!valid) {
+            str_p = quote_block_end_p + 1;
+        }
+    } while(!valid);
 
     return (WCHAR *)c_p;
 }
@@ -171,7 +185,7 @@ static WCHAR *arg_end(const WCHAR *cmdline) {
 
     while (*cmdline != L'\0' && !iswspace(*cmdline)) {
         if (*cmdline == L'"') {
-            cmdline = find_real_dquote(cmdline + 1);
+            cmdline = first_nonescaped_dquote(cmdline + 1);
             if (cmdline == NULL)
                 return NULL;
         }
@@ -280,6 +294,72 @@ static BOOL is_foreground(WCHAR *job_cmdline) {
 
 
 /**
+ * readjust_quotes
+ * 
+ * Scans str for double quotes.
+ * If double quotes are present, they are removed and the whole string is 
+ * enclosed in double quotes.
+ * If not, the string is left as is.
+ * 
+ * str: NULL-terminated string to be scanned and adjusted.
+ * 
+ * Return Value: Returns TRUE on success, FALSE on failure.
+ *               Will only fail if string ends with unclosed quotes.
+ */
+static BOOL readjust_quotes(WCHAR *str) {
+    
+    WCHAR *first_quote = wcschr(str, L'"');
+    if (first_quote == NULL) {
+        return TRUE;
+    }
+    WCHAR *block_start = first_quote + 1,
+          *block_end;
+    DWORD chars_removed = 1;
+    BOOL curr_quoted = TRUE;
+
+    while (TRUE) {
+
+        BOOL done = FALSE;
+
+        if (curr_quoted) {
+            block_end = first_nonescaped_dquote(block_start);
+            if (block_end == NULL) 
+                return FALSE;
+        }
+        else {
+            block_end = wcschr(block_start, L'"');
+            if (block_end == NULL) {
+                block_end = block_start + wcslen(block_start);
+                done = TRUE;
+            }
+        }
+
+        memmove(
+            block_start - chars_removed, 
+            block_start,
+            (block_end - block_start) * sizeof(WCHAR)
+        );
+
+        if (done)
+            break;
+        
+        block_start = block_end + 1;
+        curr_quoted = not curr_quoted;
+        chars_removed++;
+    }
+
+    DWORD str_len = (DWORD)(block_end - chars_removed - str);
+    memmove(str + 1, str, str_len * sizeof(WCHAR));
+    str[0] = L'"';
+    str[str_len + 1] = L'"';
+    str[str_len + 2] = L'\0';
+
+    return TRUE;
+}
+
+
+
+/**
  * parse_job_cmdline
  * 
  * Parses a job command line and returns the information needed to spawn
@@ -337,14 +417,37 @@ parsed_process_t *parse_job_cmdline(const WCHAR *job_cmdline,
         // application_name
         WCHAR *space_p = nonquoted_wcschr(parsed_proc->cmd_line, L' ');
         size_t len_application_name = 
-            space_p ? space_p - parsed_proc->cmd_line : len_proc_cmdlines[i];
+            space_p ? space_p - parsed_proc->cmd_line 
+                    : len_proc_cmdlines[i];
         memcpy(
             parsed_proc->application_name, 
             parsed_proc->cmd_line, 
             len_application_name * sizeof(WCHAR)
         );
         parsed_proc->application_name[len_application_name] = L'\0'; 
+        readjust_quotes(parsed_proc->application_name);
+        size_t new_len_application_name = wcslen(parsed_proc->application_name);
 
+        // adjust cmd_line for the readjusted application_name
+        // this is so stupid - CreateProcess is stupid
+        memmove(
+            parsed_proc->cmd_line + new_len_application_name,
+            parsed_proc->cmd_line + len_application_name,
+            (len_proc_cmdlines[i] - len_application_name) * sizeof(WCHAR)
+        );
+        memmove(
+            parsed_proc->cmd_line, 
+            parsed_proc->application_name, 
+            new_len_application_name * sizeof(WCHAR)
+        );
+        if (parsed_proc->application_name[0] == L'"') {
+            memmove(
+                parsed_proc->application_name, 
+                parsed_proc->application_name + 1,
+                (new_len_application_name - 2) * sizeof(WCHAR)
+            );
+            parsed_proc->application_name[new_len_application_name - 2] = L'\0';
+        }
         // foreground?
         *out_is_foreground = is_foreground(parsed_proc->cmd_line);
 

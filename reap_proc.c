@@ -49,8 +49,10 @@ BOOL reap_proc(HANDLE proc_h) {
         return FALSE;
 
     if (job->n_procs_alive == 0) {
-        free(job->proc_hs);
-        free(job->cmdline);
+        // Note: We still need cmdline for jobs call, we will free these in
+        //       jobs_builtin.
+        // free(job->proc_hs);
+        // free(job->cmdline);
         job->status = TERMINATED;
     }
 

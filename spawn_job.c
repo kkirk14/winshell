@@ -170,53 +170,6 @@ static HANDLE open_in_file(const WCHAR *in_file) {
 
 
 
-/**
- * spawn_job_failure_recover
- * 
- * Called by spawn_job when some kind of error occurs in the middle of 
- * spawning the processes (like syscall error).
- * Frees any resources for the job structs.
- * Terminates all active processes (with TerminateProcess).
- * 
- * job: Contains information on the job that failed - was in the process of 
- *      being built.
- * 
- * Return Value: Returns TRUE on success, FALSE on failure.
- */
-static BOOL spawn_job_failure_recover(job_t *job) {
-
-    BOOL bool_rc;
-    DWORD dw_rc, exit_code;
-
-    // kill all processes
-    for (int i = 0; i < job->n_procs_alive; i++) {
-        HANDLE proc_h = job->proc_hs[i];
-        DWORD pid = GetProcessId(proc_h);
-        bool_rc = TerminateProcess(proc_h, 1);
-        if (!bool_rc) {
-            print_err(L"spawn_job_failure_recover -> TerminateProcess");
-            continue;
-        }
-        do {
-            dw_rc = WaitForSingleObject(proc_h, INFINITE);
-            if (dw_rc == WAIT_FAILED) {
-                print_err(L"spawn_job_failure_recover -> WaitForSingleObject");
-                break;
-            }
-            bool_rc = GetExitCodeProcess(proc_h, &exit_code);
-        } while(bool_rc && exit_code == STILL_ACTIVE);
-
-        CloseHandle(proc_h);
-    }
-
-    // Free job resources
-    free(job->proc_hs);
-    free(job->cmdline);
-    job->status = GARBAGE;
-}
-
-
-
 static void hexdump(const void *addr, DWORD n_bytes) {
 
     const unsigned char *addr_c = (const unsigned char *)addr;
@@ -318,7 +271,7 @@ int32_t spawn_job(const WCHAR *job_cmdline) {
             bool_rc = create_my_pipe(&my_next_read_pipe, &dup_write_pipe);
             if (!bool_rc) {
                 print_err(L"spawn_job -> create_my_pipe");
-                spawn_job_failure_recover(job);
+                terminate_job(job);
                 return SPAWNJOB_SYSCALL_FAILURE;
             }
             startup_info.hStdOutput = dup_write_pipe;
@@ -349,7 +302,7 @@ int32_t spawn_job(const WCHAR *job_cmdline) {
             if (!bool_rc) {
                 CloseHandle(my_prev_read_pipe);
                 print_err(L"DuplicateHandle my_prev_read_pipe");
-                spawn_job_failure_recover(job);
+                terminate_job(job);
                 return SPAWNJOB_SYSCALL_FAILURE;
             }
             startup_info.hStdInput = dup_prev_read_pipe;
@@ -369,40 +322,61 @@ int32_t spawn_job(const WCHAR *job_cmdline) {
             startup_info.hStdInput = stdin_h;
         }
 
+        // ---------- Builtins ----------
+
+        // exit
+        if (wcscmp(curr_parsed_proc->application_name, L"exit") == 0) {
+            // TODO
+        }
+
+        // jobs
+        else if (wcscmp(curr_parsed_proc->application_name, L"jobs") == 0) {
+            jobs_builtin(curr_parsed_proc, &startup_info);
+        }
+
+        // kill
+        else if (wcscmp(curr_parsed_proc->application_name, L"kill") == 0) {
+            kill_builtin(curr_parsed_proc, &startup_info);
+        }
+
+        // TODO: cd and pwd
+
         // ---------- Process spawning ----------
+        else {
 
-        PROCESS_INFORMATION proc_info;
+            PROCESS_INFORMATION proc_info;
 
-        // Setup CreateProcessW creation flags
-        DWORD dwCreationFlags = CREATE_UNICODE_ENVIRONMENT;
-        if (job->n_procs_alive == 0) {
-            dwCreationFlags |= CREATE_NEW_PROCESS_GROUP;
-        }
+            // Setup CreateProcessW creation flags
+            DWORD dwCreationFlags = CREATE_UNICODE_ENVIRONMENT;
+            if (job->n_procs_alive == 0) {
+                dwCreationFlags |= CREATE_NEW_PROCESS_GROUP;
+            }
 
-        // TODO: resolve application_name to absolute path
+            // TODO: resolve application_name to absolute path
 
-        // Call CreateProcessW
-        bool_rc = CreateProcessW(
-            curr_parsed_proc->application_name,
-            curr_parsed_proc->cmd_line,
-            NULL,
-            NULL,
-            TRUE,
-            dwCreationFlags,
-            NULL, // envp,
-            NULL, // curr_dir,
-            &startup_info,
-            &proc_info
-        );
-        if (!bool_rc) { // CreateProcessW failed
-            print_err(L"spawn_job -> CreateProcessW");
-            spawn_job_failure_recover(job);
-            return SPAWNJOB_SYSCALL_FAILURE;
-        }
-        else { // CreateProcessW successful
-            job->proc_hs[job->n_procs_alive++] = proc_info.hProcess;
-            job->status = RUNNING;
-            CloseHandle(proc_info.hThread);
+            // Call CreateProcessW
+            bool_rc = CreateProcessW(
+                curr_parsed_proc->application_name,
+                curr_parsed_proc->cmd_line,
+                NULL,
+                NULL,
+                TRUE,
+                dwCreationFlags,
+                NULL, // envp,
+                NULL, // curr_dir,
+                &startup_info,
+                &proc_info
+            );
+            if (!bool_rc) { // CreateProcessW failed
+                print_err(L"spawn_job -> CreateProcessW");
+                terminate_job(job);
+                return SPAWNJOB_SYSCALL_FAILURE;
+            }
+            else { // CreateProcessW successful
+                job->proc_hs[job->n_procs_alive++] = proc_info.hProcess;
+                job->status = RUNNING;
+                CloseHandle(proc_info.hThread);
+            }
         }
 
         // ---------- Clean up ----------
@@ -422,6 +396,10 @@ int32_t spawn_job(const WCHAR *job_cmdline) {
     }
 
     free(parsed_procs);
+
+    if (job->n_procs_alive == 0) {
+        return SPAWNJOB_EMPTY_JOB;
+    }
 
     // Return
     return jid;

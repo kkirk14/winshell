@@ -55,6 +55,9 @@
 /* SPAWNJOB_SYSCALL_FAILURE: A syscall failed. */
 #define SPAWNJOB_SYSCALL_FAILURE -4
 
+/* SPAWNJOB_EMPTY_JOB: The job only contained builtins. */
+#define SPAWNJOB_EMPTY_JOB -5
+
 
 
 /* wait_handles: Points to heap-allocated array of handles. This is the array
@@ -212,6 +215,67 @@ BOOL reap_proc(HANDLE proc_h);
 parsed_process_t *parse_job_cmdline(const WCHAR *job_cmdline,
                                     int32_t *out_n_procs,
                                     BOOL *out_is_foreground);
+
+
+
+/**
+ * job_to_str
+ * 
+ * Creates a string description for a given job.
+ * 
+ * job: job_t object to describe.
+ * 
+ * Return Value: Returns a pointer to a heap-allocated NULL-terminated string 
+ *               containing the description for the job. Must be freed with 
+ *               free().
+ *               Returns NULL on error.
+ */
+WCHAR *job_to_str(const job_t *job);
+
+
+
+
+/**
+ * terminate_job
+ * 
+ * Terminates a job, probably before it's finished.
+ * Frees any resources for the job structs.
+ * Terminates all active processes (with TerminateProcess).
+ * 
+ * job: Contains information on the job that failed - was in the process of 
+ *      being built.
+ * 
+ * Return Value: Returns TRUE on success, FALSE on failure.
+ */
+BOOL terminate_job(job_t *job);
+
+
+
+/**
+ * kill_builtin
+ * 
+ * parsed_proc: Parsed info about the command that called this builtin.
+ * startup_info: Should be setup for I/O redirection. Will send output to
+ *               the hStdOutput HANDLE.
+ * 
+ * Return Value: Returns TRUE on success, FALSE on failure.
+ */
+BOOL kill_builtin(parsed_process_t *parsed_proc, 
+                  STARTUPINFO *startup_info);
+
+
+
+/**
+ * jobs_builtin
+ * 
+ * parsed_proc: Contains parsed information about command line that called
+ *              this builtin to be called.
+ * startup_info: Contains redirection info - will output to hStdOutput.
+ * 
+ * Return Value: Returns TRUE on success, returns FALSE on failure.
+ */
+BOOL jobs_builtin(parsed_process_t *parsed_proc, 
+                  STARTUPINFO *startup_info);
 
 
 
