@@ -80,6 +80,11 @@ extern job_t jobs[];
 
 
 
+/* cmdline_reader_thread_h: Kernel HANDLE to the cmdline reader thread. */
+extern HANDLE cmdline_reader_thread_h;
+
+
+
 /* cmdline: Contains a line read from stdin waiting to be read by the job 
             spawner thread. */
 extern WCHAR cmdline[];
@@ -275,6 +280,21 @@ BOOL kill_builtin(parsed_process_t *parsed_proc,
  * Return Value: Returns TRUE on success, returns FALSE on failure.
  */
 BOOL jobs_builtin(parsed_process_t *parsed_proc, 
+                  STARTUPINFO *startup_info);
+
+
+
+/**
+ * exit_builtin
+ * 
+ * Kills all running processes and terminates the shell.
+ * This function doesn't return - the process terminates.
+ * 
+ * parsed_proc: Parsed info from command that called this builtin, not
+ *              used.
+ * startup_info: Redirection info, not used.
+ */
+void exit_builtin(parsed_process_t *parsed_proc, 
                   STARTUPINFO *startup_info);
 
 

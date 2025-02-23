@@ -73,7 +73,7 @@ void shell_loop() {
     job_t *fg_job = NULL;
 
     // Create the cmdline reader thread
-    HANDLE cmdline_reader_thread = CreateThread(
+    cmdline_reader_thread_h = CreateThread(
         NULL,
         0,
         cmdline_reader_tproc,
@@ -81,7 +81,7 @@ void shell_loop() {
         0,
         NULL
     );
-    if (cmdline_reader_thread == INVALID_HANDLE_VALUE) {
+    if (cmdline_reader_thread_h == INVALID_HANDLE_VALUE) {
         print_err(L"shell_loop -> CreateThread");
         ExitProcess(1);
     }

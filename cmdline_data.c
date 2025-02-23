@@ -12,6 +12,11 @@
 
 
 
+/* cmdline_reader_thread_h: Kernel HANDLE to the cmdline reader thread. */
+HANDLE cmdline_reader_thread_h;
+
+
+
 /* cmdline: Contains a line read from stdin waiting to be read by the job 
             spawner thread. */
 WCHAR cmdline[MAX_CMDLINE + 1];

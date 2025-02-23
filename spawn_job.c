@@ -326,7 +326,7 @@ int32_t spawn_job(const WCHAR *job_cmdline) {
 
         // exit
         if (wcscmp(curr_parsed_proc->application_name, L"exit") == 0) {
-            // TODO
+            exit_builtin(curr_parsed_proc, &startup_info);
         }
 
         // jobs
